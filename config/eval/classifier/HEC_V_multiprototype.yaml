@@ -1,0 +1,8 @@
+_target_: src.fewshot.classifier_multiprototype.ClassifierHEC_V_multiprototype
+
+input_mode: cls
+
+k: 20
+tau: 10
+cov_reg: 1
+ensemble_method: mean_prob

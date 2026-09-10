@@ -247,7 +247,7 @@ class QwenV2Wrapper(VLVMWrapper):
             weights,
             local_files_only=True,
             attn_implementation="sdpa",
-            dtype=torch.float16, 
+            torch_dtype=torch.float16, 
             device_map=kwargs["device"],
         ).eval()
         
@@ -255,17 +255,17 @@ class QwenV2Wrapper(VLVMWrapper):
             weights
         )
 
-        self.depth = len(self.model.model.visual.blocks)
+        self.depth = len(self.model.visual.blocks)  # FIX(tf49): visual is top-level attr
         self.num_features_out = num_features_out
         self.num_features_hidden = 1280
 
-        self.depth_llm = len(self.model.model.language_model.layers)
+        self.depth_llm = len(self.model.model.layers)  # FIX(tf49)
         self.num_features_hidden_llm = 3584
 
         def register_llm_attn_heads_last_token_hooks(model):
             acts = {}
             hooks = []
-            layers = model.model.language_model.layers
+            layers = model.model.layers
         
             for i, layer in enumerate(layers):
                 attn = layer.self_attn
@@ -291,11 +291,11 @@ class QwenV2Wrapper(VLVMWrapper):
 
         def register_llm_last_layer_prompt_lasttok_hook(model):
             acts = {}
-            layer = model.model.language_model.layers[-1]
+            layer = model.model.layers[-1]
 
             def f(module, inp, out):
                 #hs = out[0]  # [B, T, H]  # WARNING: TRANSFORMER NOT RETROCOMPATIBLE
-                hs = out  # [B, T, H]  # WARNING: TRANSFORMER NOT RETROCOMPATIBLE
+                hs = out[0]  # [B, T, H]  # FIX(tf49): transformers 4.49 returns tuple (hidden_states, pkv)
                 if hs.shape[1] > 1 and "x_norm_clstoken" not in acts:  # first (prompt) pass in generate
                     acts["x_norm_clstoken"] = hs[:, -1, :].detach()     # [B, H]
 
@@ -338,7 +338,7 @@ class QwenV2Wrapper(VLVMWrapper):
         )
 
         # Build Input
-        inputs = self.processor(text=[text_prompt]*B, images=255*x, padding=True, return_tensors="pt")
+        inputs = self.processor(text=[text_prompt]*B, images=(255*x).to(torch.uint8), padding=True, return_tensors="pt")  # FIX(tf49): pass uint8
         inputs.to(device)
 
 
@@ -456,14 +456,14 @@ class LLaVAWrapper(VLVMWrapper):
         self.processor.tokenizer.pad_token = self.processor.tokenizer.eos_token
         self.model.generation_config.pad_token_id = self.processor.tokenizer.eos_token_id
 
-        self.depth_llm = len(self.model.model.language_model.layers)
+        self.depth_llm = len(self.model.model.layers)  # FIX(tf49)
         self.num_features_hidden_llm = self.model.config.text_config.hidden_size
         self.num_features_out = num_features_out
         self.output_llm_lasttok_heads = output_llm_lasttok_heads
 
         def register_llm_last_layer_prompt_lasttok_hook(model):
             acts = {}
-            layer = model.model.language_model.layers[-1]
+            layer = model.model.layers[-1]
 
             def f(module, inp, out):
                 hs = out[0] if isinstance(out, (tuple, list)) else out
@@ -480,7 +480,7 @@ class LLaVAWrapper(VLVMWrapper):
         def register_llm_attn_heads_last_token_hooks(model):
             acts = {}
             hooks = []
-            layers = model.model.language_model.layers
+            layers = model.model.layers
 
             for i, layer in enumerate(layers):
                 attn = layer.self_attn
