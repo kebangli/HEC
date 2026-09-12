@@ -1,0 +1,5 @@
+# @package _global_
+PATH_data: /data2/lbk/HEC_repro/data
+PATH_work: /data2/lbk/HEC
+PATH_logs: /data2/lbk/HEC_repro/logs
+PATH_weights: /data2/lbk/HEC_repro/weights
