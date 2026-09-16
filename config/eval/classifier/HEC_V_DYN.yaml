@@ -1,0 +1,25 @@
+_target_: src.fewshot.classifier.ClassifierHEC_V_Dynamic
+
+input_mode: cls
+
+k: 20            # used when routing: off (official static HEC-V baseline)
+tau: 10
+cov_reg: 1
+ensemble_method: mean_prob
+
+# ---- Dynamic Head Routing (RouteHead-inspired) ----
+routing: class_cond   # off | sample_router | class_cond | knn
+pool_size: 64         # RouteHead: restrict search to top-K head pool
+budget: 8             # max heads per set (adaptive: early stopping)
+min_heads: 4          # min heads per set (forced fill; sparsity beyond via router L1)
+search_eps: 0.0       # min improvement for greedy/swap acceptance
+n_folds: 4            # cross-fit folds for OOF pseudo labels
+select: topk          # sample_router inference: topk | thresh | soft
+k_route: 8            # heads per query for topk/thresh selection
+knn_neighbors: 4      # knn routing: support neighbours for head scoring
+router_dim_head: 64
+router_lr: 0.001
+router_epochs: 300
+router_l1: 0.05
+router_wd: 0.0001
+routing_seed: 0
